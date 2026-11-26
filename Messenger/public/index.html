@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#17212b">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Мессенджер</title>
+<style>
+  :root { --bg:#0e1621; --panel:#17212b; --line:#243240; --text:#e8eef4; --muted:#7f91a4;
+          --accent:#4c9ce2; --mine:#2b5278; --theirs:#182533; }
+  * { box-sizing:border-box; margin:0; }
+  html,body { height:100%; }
+  body { font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
+  button,input { font:inherit; color:inherit; }
+  input { background:#0e1621; border:1px solid var(--line); border-radius:10px; padding:12px 14px; width:100%; outline:none; }
+  input:focus { border-color:var(--accent); }
+  button { cursor:pointer; border:0; border-radius:10px; padding:12px 16px; background:var(--accent); color:#fff; font-weight:600; }
+  button.ghost { background:transparent; color:var(--accent); }
+  .hidden { display:none !important; }
+
+  /* вход */
+  #auth { min-height:100%; display:grid; place-items:center; padding:20px; }
+  .card { width:100%; max-width:380px; background:var(--panel); border-radius:16px; padding:24px; display:grid; gap:12px; }
+  .card h1 { font-size:22px; text-align:center; }
+  .tabs { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .tabs button { background:#0e1621; color:var(--muted); }
+  .tabs button.on { background:var(--accent); color:#fff; }
+  .err { color:#ff7b7b; font-size:14px; min-height:18px; }
+  .hint { color:var(--muted); font-size:13px; }
+  .keybox { background:#0e1621; border:1px dashed var(--accent); border-radius:10px; padding:14px; text-align:center;
+            font:600 15px ui-monospace,Menlo,monospace; word-break:break-all; user-select:all; }
+
+  /* приложение */
+  #app { height:100%; display:grid; grid-template-columns:340px 1fr; }
+  #side { background:var(--panel); border-right:1px solid var(--line); display:flex; flex-direction:column; min-height:0; }
+  .me { display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--line); }
+  .me .who { flex:1; min-width:0; }
+  .me b, .me small { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  small { color:var(--muted); }
+  .search { padding:10px 12px; }
+  #list { overflow:auto; flex:1; }
+  .item { display:flex; gap:12px; padding:10px 14px; cursor:pointer; align-items:center; }
+  .item:hover, .item.on { background:#202b36; }
+  .ava { width:46px; height:46px; border-radius:50%; flex:none; display:grid; place-items:center; font-weight:700; color:#fff; }
+  .item .t { min-width:0; flex:1; }
+  .item .t b, .item .t small { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .badge { background:var(--accent); border-radius:12px; padding:0 8px; font-size:13px; font-weight:700; }
+  .label { padding:8px 14px; color:var(--muted); font-size:13px; text-transform:uppercase; letter-spacing:.04em; }
+
+  #chat { display:flex; flex-direction:column; min-height:0; min-width:0; }
+  .head { display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--panel); border-bottom:1px solid var(--line); }
+  .head .back { display:none; padding:6px 10px; background:transparent; font-size:20px; color:var(--accent); }
+  #msgs { flex:1; overflow:auto; padding:14px; display:flex; flex-direction:column; gap:6px; }
+  .m { max-width:min(75%,520px); padding:8px 12px; border-radius:14px; background:var(--theirs); align-self:flex-start; white-space:pre-wrap; word-wrap:break-word; overflow-wrap:anywhere; }
+  .m.mine { background:var(--mine); align-self:flex-end; }
+  .m time { display:block; text-align:right; font-size:11px; color:var(--muted); margin-top:2px; }
+  .empty { margin:auto; color:var(--muted); text-align:center; padding:20px; }
+  form.send { display:flex; gap:8px; padding:10px; background:var(--panel); border-top:1px solid var(--line); padding-bottom:max(10px, env(safe-area-inset-bottom)); }
+
+  /* звонки */
+  .head .callbtn { margin-left:auto; padding:8px 12px; background:transparent; font-size:20px; }
+  .head .callbtn:hover { background:#202b36; }
+  #call { position:fixed; inset:0; z-index:50; background:rgba(14,22,33,.97); display:flex; flex-direction:column;
+          align-items:center; justify-content:center; gap:14px; text-align:center; padding:20px; }
+  #call .ava { width:110px; height:110px; font-size:44px; }
+  #call h2 { font-size:24px; }
+  #call .st { color:var(--muted); }
+  .cbtns { display:flex; gap:22px; margin-top:20px; }
+  .cbtns button { width:64px; height:64px; border-radius:50%; font-size:26px; padding:0; }
+  .cbtns .red { background:#e5484d; }
+  .cbtns .green { background:#2fb344; }
+  .cbtns .mute { background:#2b3a4a; }
+  .cbtns .mute.on { background:#fff; color:#000; }
+  @media (max-width:760px) {
+    #app { grid-template-columns:1fr; }
+    #chat { display:none; }
+    #app.chatting #side { display:none; }
+    #app.chatting #chat { display:flex; }
+    .head .back { display:block; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ВХОД / РЕГИСТРАЦИЯ -->
+<div id="auth">
+  <div class="card">
+    <h1>💬 Мессенджер</h1>
+    <div class="tabs">
+      <button id="tabReg" class="on">Регистрация</button>
+      <button id="tabLogin">Вход по ключу</button>
+    </div>
+
+    <form id="regForm" style="display:grid;gap:10px">
+      <input id="rName" placeholder="Имя" maxlength="40" autocomplete="given-name" required>
+      <input id="rSurname" placeholder="Фамилия (необязательно)" maxlength="40" autocomplete="family-name">
+      <input id="rUser" placeholder="Юзернейм, например ivan_2007" maxlength="21" autocapitalize="off" autocomplete="username" required>
+      <button>Зарегистрироваться</button>
+    </form>
+
+    <form id="loginForm" class="hidden" style="display:grid;gap:10px">
+      <input id="lKey" placeholder="Ключ доступа XXXX-XXXX-…" autocapitalize="characters" required>
+      <button>Войти</button>
+      <div class="hint">Ключ выдаётся при регистрации. Он нужен, чтобы зайти с другого устройства.</div>
+    </form>
+    <div class="err" id="authErr"></div>
+  </div>
+</div>
+
+<!-- ПОКАЗ КЛЮЧА ПОСЛЕ РЕГИСТРАЦИИ -->
+<div id="keyScreen" class="hidden" style="min-height:100%;display:grid;place-items:center;padding:20px">
+  <div class="card">
+    <h1>Твой ключ доступа</h1>
+    <div class="keybox" id="keyText"></div>
+    <div class="hint">⚠️ Сохрани его (скриншот или заметка). Пароля нет — ключ единственный способ зайти с нового телефона или после очистки браузера. Потерял — аккаунт потерян.</div>
+    <button id="copyKey" class="ghost">Скопировать</button>
+    <button id="keyDone">Я сохранил, продолжить</button>
+  </div>
+</div>
+
+<!-- ПРИЛОЖЕНИЕ -->
+<div id="app" class="hidden">
+  <aside id="side">
+    <div class="me">
+      <div class="ava" id="meAva"></div>
+      <div class="who"><b id="meName"></b><small id="meUser"></small></div>
+      <button class="ghost" id="logout" title="Выйти">Выйти</button>
+    </div>
+    <div class="search"><input id="q" placeholder="Найти по @юзернейму или имени" autocapitalize="off"></div>
+    <div id="list"></div>
+  </aside>
+  <section id="chat">
+    <div class="empty" id="noChat">Выбери чат слева или найди друга по юзернейму</div>
+    <div id="chatBox" style="display:none;flex-direction:column;flex:1;min-height:0">
+      <div class="head">
+        <button class="back" id="back">←</button>
+        <div class="ava" id="hAva" style="width:38px;height:38px"></div>
+        <div><b id="hName"></b><br><small id="hUser"></small></div>
+        <button class="callbtn" id="callBtn" title="Позвонить">📞</button>
+      </div>
+      <div id="msgs"></div>
+      <form class="send" id="sendForm">
+        <input id="text" placeholder="Сообщение" autocomplete="off" maxlength="4000">
+        <button>➤</button>
+      </form>
+    </div>
+  </section>
+</div>
+
+<!-- ЗВОНОК -->
+<div id="call" class="hidden">
+  <div class="ava" id="cAva"></div>
+  <h2 id="cName"></h2>
+  <div class="st" id="cStatus"></div>
+  <div class="cbtns">
+    <button class="green hidden" id="cAccept" title="Принять">📞</button>
+    <button class="mute hidden" id="cMute" title="Выключить микрофон">🎤</button>
+    <button class="red" id="cEnd" title="Завершить">✖</button>
+  </div>
+</div>
+<audio id="remoteAudio" autoplay playsinline></audio>
+
+<script>
+const $ = id => document.getElementById(id);
+let KEY = localStorage.getItem('key') || '';
+let ME = null, current = null, chats = [], unread = {}, es = null;
+
+const colors = ['#e17076','#faa774','#a695e7','#7bc862','#6ec9cb','#65aadd','#ee7aae'];
+function ava(el, u) {
+  const full = (u.name + ' ' + (u.surname || '')).trim();
+  el.textContent = (u.name[0] || '?').toUpperCase();
+  let h = 0; for (const c of u.username) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  el.style.background = colors[h % colors.length];
+  el.title = full;
+}
+const fullName = u => (u.name + ' ' + (u.surname || '')).trim();
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts,
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + KEY } });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Ошибка');
+  return data;
+}
+const post = (path, obj) => api(path, { method: 'POST', body: JSON.stringify(obj) });
+
+/* ---------- вход / регистрация ---------- */
+function showTab(reg) {
+  $('regForm').classList.toggle('hidden', !reg); $('loginForm').classList.toggle('hidden', reg);
+  $('regForm').style.display = reg ? 'grid' : 'none'; $('loginForm').style.display = reg ? 'none' : 'grid';
+  $('tabReg').classList.toggle('on', reg); $('tabLogin').classList.toggle('on', !reg); $('authErr').textContent = '';
+}
+$('tabReg').onclick = () => showTab(true);
+$('tabLogin').onclick = () => showTab(false);
+
+$('regForm').onsubmit = async e => {
+  e.preventDefault(); $('authErr').textContent = '';
+  try {
+    const r = await post('/api/register', { name: $('rName').value, surname: $('rSurname').value, username: $('rUser').value });
+    KEY = r.key; ME = r.user; localStorage.setItem('key', KEY);
+    $('auth').classList.add('hidden'); $('keyText').textContent = KEY; $('keyScreen').classList.remove('hidden');
+  } catch (err) { $('authErr').textContent = err.message; }
+};
+$('copyKey').onclick = () => { navigator.clipboard?.writeText(KEY); $('copyKey').textContent = 'Скопировано ✓'; };
+$('keyDone').onclick = () => { $('keyScreen').classList.add('hidden'); startApp(); };
+$('loginForm').onsubmit = async e => {
+  e.preventDefault(); $('authErr').textContent = '';
+  try {
+    const r = await post('/api/login', { key: $('lKey').value });
+    KEY = r.key; ME = r.user; localStorage.setItem('key', KEY); startApp();
+  } catch (err) { $('authErr').textContent = err.message; }
+};
+$('logout').onclick = () => { if (confirm('Выйти? Сохрани ключ доступа, иначе не сможешь вернуться.')) { localStorage.removeItem('key'); location.reload(); } };
+
+/* ---------- приложение ---------- */
+async function startApp() {
+  if (!ME) { try { ME = await api('/api/me'); } catch { localStorage.removeItem('key'); return location.reload(); } }
+  $('auth').classList.add('hidden'); $('app').classList.remove('hidden');
+  ava($('meAva'), ME); $('meName').textContent = fullName(ME); $('meUser').textContent = '@' + ME.username;
+  await loadChats(); connect();
+}
+async function loadChats() { chats = await api('/api/chats'); if (!$('q').value.trim()) renderChats(); }
+
+function item(u, sub, badge, on) {
+  const d = document.createElement('div'); d.className = 'item' + (on ? ' on' : '');
+  const a = document.createElement('div'); a.className = 'ava'; ava(a, u);
+  const t = document.createElement('div'); t.className = 't';
+  const b = document.createElement('b'); b.textContent = fullName(u);
+  const s = document.createElement('small'); s.textContent = sub;
+  t.append(b, s); d.append(a, t);
+  if (badge) { const bd = document.createElement('span'); bd.className = 'badge'; bd.textContent = badge; d.append(bd); }
+  d.onclick = () => openChat(u);
+  return d;
+}
+function renderChats() {
+  const l = $('list'); l.textContent = '';
+  if (!chats.length) { const e = document.createElement('div'); e.className = 'empty'; e.textContent = 'Пока нет чатов. Найди друга по юзернейму выше 👆'; l.append(e); return; }
+  for (const c of chats) {
+    const pre = c.last.from === ME.username ? 'Вы: ' : '';
+    l.append(item(c.user, pre + c.last.text, unread[c.user.username], current?.username === c.user.username));
+  }
+}
+let searchTimer;
+$('q').oninput = () => {
+  clearTimeout(searchTimer);
+  const q = $('q').value.trim();
+  if (!q) return renderChats();
+  searchTimer = setTimeout(async () => {
+    const res = await api('/api/users?q=' + encodeURIComponent(q)).catch(() => []);
+    const l = $('list'); l.textContent = '';
+    const lb = document.createElement('div'); lb.className = 'label'; lb.textContent = 'Результаты поиска'; l.append(lb);
+    if (!res.length) { const e = document.createElement('div'); e.className = 'empty'; e.textContent = 'Никого не нашли'; l.append(e); }
+    res.forEach(u => l.append(item(u, '@' + u.username)));
+  }, 250);
+};
+
+async function openChat(u) {
+  current = u; unread[u.username] = 0;
+  $('q').value = ''; renderChats();
+  $('noChat').style.display = 'none'; $('chatBox').style.display = 'flex';
+  $('app').classList.add('chatting');
+  ava($('hAva'), u); $('hName').textContent = fullName(u); $('hUser').textContent = '@' + u.username;
+  const msgs = await api('/api/messages?with=' + encodeURIComponent(u.username));
+  $('msgs').textContent = '';
+  if (!msgs.length) { const e = document.createElement('div'); e.className = 'empty'; e.id = 'emptyMsg'; e.textContent = 'Напиши первое сообщение 👋'; $('msgs').append(e); }
+  msgs.forEach(addMsg); $('text').focus();
+}
+$('back').onclick = () => { current = null; $('app').classList.remove('chatting'); renderChats(); };
+
+function addMsg(m) {
+  $('emptyMsg')?.remove();
+  const d = document.createElement('div'); d.className = 'm' + (m.from === ME.username ? ' mine' : '');
+  d.textContent = m.text;
+  const t = document.createElement('time');
+  t.textContent = new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  d.append(t); $('msgs').append(d); $('msgs').scrollTop = $('msgs').scrollHeight;
+}
+$('sendForm').onsubmit = async e => {
+  e.preventDefault();
+  const text = $('text').value.trim(); if (!text || !current) return;
+  $('text').value = '';
+  try { await post('/api/send', { to: current.username, text }); } catch (err) { alert(err.message); $('text').value = text; }
+};
+
+function connect() {
+  es?.close();
+  es = new EventSource('/api/stream?key=' + encodeURIComponent(KEY));
+  es.addEventListener('signal', ev => onSignal(JSON.parse(ev.data)));
+  es.addEventListener('message', ev => {
+    const { message: m, user } = JSON.parse(ev.data);
+    const other = m.from === ME.username ? m.to : m.from;
+    if (current?.username === other) addMsg(m);
+    else if (m.from !== ME.username) { unread[other] = (unread[other] || 0) + 1; document.title = '● Мессенджер'; }
+    chats = chats.filter(c => c.user.username !== other); chats.unshift({ user, last: m });
+    if (!$('q').value.trim()) renderChats();
+  });
+  es.onopen = () => { if (current) openChat(current); else loadChats(); };
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) document.title = 'Мессенджер'; });
+
+/* ---------- голосовые звонки (WebRTC) ---------- */
+const RTC_CFG = { iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }] };
+let call = null; // { peer:user, pc, stream, role:'caller'|'callee', state, pendingIce:[], offer, timer, ring }
+let sigQ = Promise.resolve();
+const sendSignal = (to, type, data) => { sigQ = sigQ.then(() => post('/api/signal', { to, type, data })).catch(() => ({})); return sigQ; };
+
+function ringtone(on) {
+  try {
+    if (call?.ring) { clearInterval(call.ring.iv); call.ring.ctx.close(); call.ring = null; }
+    if (!on) return;
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const beep = () => { const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = 440; g.gain.value = 0.08; o.connect(g); g.connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime + 0.4); };
+    beep(); call.ring = { ctx, iv: setInterval(beep, 1500) };
+  } catch {}
+}
+function showCall(status, mode) { // mode: incoming | active
+  $('call').classList.remove('hidden');
+  ava($('cAva'), call.peer); $('cName').textContent = fullName(call.peer); $('cStatus').textContent = status;
+  $('cAccept').classList.toggle('hidden', mode !== 'incoming');
+  $('cMute').classList.toggle('hidden', mode === 'incoming');
+}
+function endCall(status) {
+  if (!call) return;
+  const c = call; ringtone(false); clearTimeout(c.timer); clearInterval(c.tick);
+  c.pc?.close(); c.stream?.getTracks().forEach(t => t.stop());
+  $('remoteAudio').srcObject = null; call = null;
+  if (status) { $('call').classList.remove('hidden'); ava($('cAva'), c.peer); $('cName').textContent = fullName(c.peer);
+    $('cStatus').textContent = status; $('cAccept').classList.add('hidden'); $('cMute').classList.add('hidden');
+    setTimeout(() => { if (!call) $('call').classList.add('hidden'); }, 1800); }
+  else $('call').classList.add('hidden');
+  $('cMute').classList.remove('on'); $('cMute').textContent = '🎤';
+}
+async function getMic() {
+  if (!navigator.mediaDevices?.getUserMedia) throw new Error('Для звонков нужен защищённый адрес (https) или localhost');
+  try { return await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false }); }
+  catch { throw new Error('Нет доступа к микрофону. Разреши его в браузере.'); }
+}
+function flushIce() {
+  if (!call) return;
+  call.sdpSent = true;
+  for (const c of call.localIce) sendSignal(call.peer.username, 'ice', c);
+  call.localIce = [];
+}
+function makePeer() {
+  const pc = new RTCPeerConnection(RTC_CFG);
+  call.pc = pc;
+  call.stream.getTracks().forEach(t => pc.addTrack(t, call.stream));
+  call.localIce = []; call.sdpSent = false;
+  pc.onicecandidate = e => {
+    if (!e.candidate || !call) return;
+    if (call.sdpSent) sendSignal(call.peer.username, 'ice', e.candidate); // сначала offer/answer, потом кандидаты
+    else call.localIce.push(e.candidate);
+  };
+  pc.ontrack = e => { $('remoteAudio').srcObject = e.streams[0]; $('remoteAudio').play().catch(() => {}); };
+  pc.onconnectionstatechange = () => {
+    if (!call || call.pc !== pc) return;
+    const s = pc.connectionState;
+    if (s === 'connected') {
+      ringtone(false); clearTimeout(call.timer); call.t0 = Date.now(); showCall('00:00', 'active');
+      call.tick = setInterval(() => { const sec = Math.floor((Date.now() - call.t0) / 1000);
+        $('cStatus').textContent = String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0'); }, 1000);
+    } else if (s === 'failed') { sendSignal(call.peer.username, 'hangup'); endCall('Не удалось соединиться'); }
+    else if (s === 'disconnected') { const c = call; setTimeout(() => { if (call === c && pc.connectionState !== 'connected') endCall('Связь потеряна'); }, 6000); }
+    else if (s === 'closed') { /* закрыли мы сами */ }
+  };
+  return pc;
+}
+async function startCall() {
+  if (!current) return;
+  if (call) return;
+  let stream;
+  try { stream = await getMic(); } catch (e) { return alert(e.message); }
+  call = { peer: current, role: 'caller', stream, pendingIce: [] };
+  showCall('Вызов…', 'active');
+  try {
+    const pc = makePeer();
+    const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+    const p = sendSignal(call.peer.username, 'offer', { type: offer.type, sdp: offer.sdp });
+    flushIce();
+    const r = await p;
+    if (!call) return;
+    if (r && r.delivered === false) { endCall('Пользователь не в сети'); return; }
+    ringtone(false);
+    call.timer = setTimeout(() => { if (call && !call.t0) { sendSignal(call.peer.username, 'hangup'); endCall('Нет ответа'); } }, 40000);
+  } catch { endCall('Ошибка звонка'); }
+}
+async function acceptCall() {
+  if (!call || call.role !== 'callee' || call.pc) return;
+  ringtone(false);
+  try { call.stream = await getMic(); }
+  catch (e) { alert(e.message); sendSignal(call.peer.username, 'reject'); return endCall(); }
+  try {
+    const pc = makePeer();
+    await pc.setRemoteDescription(call.offer);
+    for (const c of call.pendingIce) await pc.addIceCandidate(c).catch(() => {});
+    call.pendingIce = [];
+    const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
+    showCall('Соединение…', 'active');
+    sendSignal(call.peer.username, 'answer', { type: answer.type, sdp: answer.sdp });
+    flushIce();
+  } catch { sendSignal(call.peer.username, 'hangup'); endCall('Ошибка звонка'); }
+}
+async function onSignal({ from, type, data }) {
+  if (type === 'offer') {
+    if (call) return sendSignal(from.username, 'busy');
+    call = { peer: from, role: 'callee', offer: data, pendingIce: [] };
+    showCall('Входящий звонок…', 'incoming'); ringtone(true);
+    call.timer = setTimeout(() => { if (call && !call.pc) endCall(); }, 45000);
+    if (document.hidden) document.title = '📞 Звонок!';
+    return;
+  }
+  if (!call || call.peer.username !== from.username) return;
+  if (type === 'answer' && call.pc) { await call.pc.setRemoteDescription(data).catch(() => {});
+    for (const c of call.pendingIce) await call.pc.addIceCandidate(c).catch(() => {}); call.pendingIce = []; }
+  else if (type === 'ice') {
+    if (call.pc && call.pc.remoteDescription) await call.pc.addIceCandidate(data).catch(() => {});
+    else call.pendingIce.push(data);
+  }
+  else if (type === 'hangup') endCall(call.t0 ? 'Звонок завершён' : (call.role === 'callee' ? 'Пропущенный звонок' : 'Звонок завершён'));
+  else if (type === 'reject') endCall('Звонок отклонён');
+  else if (type === 'busy') endCall('Занято');
+}
+$('callBtn').onclick = startCall;
+$('cAccept').onclick = acceptCall;
+$('cEnd').onclick = () => {
+  if (!call) return;
+  const peer = call.peer.username;
+  if (call.role === 'callee' && !call.pc) { sendSignal(peer, 'reject'); endCall(); }
+  else { sendSignal(peer, 'hangup'); endCall(call.t0 ? 'Звонок завершён' : null); }
+};
+$('cMute').onclick = () => {
+  if (!call?.stream) return;
+  const t = call.stream.getAudioTracks()[0]; if (!t) return;
+  t.enabled = !t.enabled; $('cMute').classList.toggle('on', !t.enabled); $('cMute').textContent = t.enabled ? '🎤' : '🔇';
+};
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+if (KEY) startApp(); else showTab(true);
+</script>
+</body>
+</html>
