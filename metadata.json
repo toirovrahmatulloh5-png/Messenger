@@ -1,6 +1,0 @@
-{
-  "name": "Эфир — Мессенджер без SIM",
-  "description": "Приватный веб-мессенджер без номера телефона и SIM-карты с голосовыми и видеозвонками, историей вызовов в чате и профилями.",
-  "requestFramePermissions": ["camera", "microphone"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
